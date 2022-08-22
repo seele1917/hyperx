@@ -9,7 +9,6 @@ from utils import helpers as utl
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
 class OnlineStorage(object):
     def __init__(self,
                  args,
@@ -24,6 +23,7 @@ class OnlineStorage(object):
                  normalise_rewards,
                  add_exploration_bonus,
                  intrinsic_reward=None,  # intrinsic rew object
+                 goal_dim=None,
                  ):
 
         self.args = args
@@ -70,6 +70,7 @@ class OnlineStorage(object):
         self.masks = torch.ones(num_steps + 1, num_processes, 1)
         # masks that indicate whether it's a true terminal state (false) or time limit end state (true)
         self.bad_masks = torch.ones(num_steps + 1, num_processes, 1)
+        self.goal = torch.zeros(num_steps + 1, num_processes, goal_dim)
 
         # actions
         if action_space.__class__.__name__ == 'Discrete':
@@ -127,6 +128,7 @@ class OnlineStorage(object):
                latent_sample=None,
                latent_mean=None,
                latent_logvar=None,
+               goal=None,
                ):
 
         self.prev_state[self.step + 1].copy_(state)
@@ -149,6 +151,7 @@ class OnlineStorage(object):
         self.bad_masks[self.step + 1].copy_(bad_masks)
         self.done[self.step + 1].copy_(done)
         self.step = (self.step + 1) % self.num_steps
+        self.goal[self.step + 1].copy_(goal)
 
     def after_update(self):
         self.prev_state[0].copy_(self.prev_state[-1])
@@ -238,6 +241,11 @@ class OnlineStorage(object):
                                                          self.tasks[:-1],
                                                          self.actions)
         self.action_log_probs = action_log_probs.detach()
+    
+    def replace_task_fail2success(self):
+        self.done[-1, :, :] = True
+        self.rewards_raw[-1, :, :] = 1
+        self.tasks.copy_(self.prev_state)
 
     def feed_forward_generator(self,
                                advantages,

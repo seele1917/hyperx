@@ -240,6 +240,8 @@ class MetaLearner:
 
             # --- UPDATE ---
 
+            self.policy_storage.replace_task_fail2success()
+            
             if (len(self.vae.rollout_storage) == 0 and not self.args.size_vae_buffer == 0) or \
                     (self.args.precollect_len > self.frames):
                 print('Not updating yet because; filling up the VAE buffer.')
